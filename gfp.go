@@ -1,6 +1,9 @@
 package bn256
 
-import "fmt"
+import (
+	"fmt"
+	"math/big"
+)
 
 type gfP [4]uint64
 
@@ -45,6 +48,39 @@ func (e *gfP) Invert(f *gfP) {
 
 	gfpMul(sum, sum, r3)
 	e.Set(sum)
+}
+
+func (e *gfP) Exp(base *gfP, power *big.Int) {
+	sum := &gfP{1}
+	t := &gfP{0}
+	for i := power.BitLen() - 1; i >= 0; i-- {
+		gfpMul(t, sum, sum)
+		if power.Bit(i) != 0 {
+			gfpMul(sum, t, base)
+		} else {
+			sum.Set(t)
+		}
+	}
+	e.Set(sum)
+}
+
+func isQuadraticResidue(number *gfP) bool {
+	exp := new(big.Int).Set(p)
+	exp.Sub(exp, new(big.Int).SetUint64(1))
+	exp.Div(exp, new(big.Int).SetUint64(2))
+	e := &gfP{0}
+	e.Exp(number, exp)
+	fmt.Println(e)
+	if e[0] == 1 {
+		return true
+	}
+	return false
+}
+
+func (e *gfP) calcQuadraticResidue(number *gfP) {
+	k := new(big.Int).Add(p, new(big.Int).SetInt64(1))
+	k.Div(k, new(big.Int).SetInt64(4))
+	e.Exp(number, k)
 }
 
 func (e *gfP) Marshal(out []byte) {

@@ -117,6 +117,71 @@ func (e *G1) Marshal() []byte {
 	return ret
 }
 
+var two = new(big.Int).SetInt64(2)
+
+// MarshalCompressed converts e to a byte slice, representing a point in compressed form
+func (e *G1) MarshalCompressed() []byte {
+	marshalled := e.Marshal()
+	xBytes := marshalled[:32]
+	y := new(big.Int).SetBytes(marshalled[32:64])
+	y.Mul(y, two)
+	if y.Cmp(p) == 1 {
+		xBytes[0] += 128
+	}
+	return xBytes
+}
+
+// UnmarshalCompressed sets e to the result of converting the output of
+// MarshalCompressed back into a group element and then returns e.
+func (e *G1) UnmarshalCompressed(m []byte) ([]byte, error) {
+	// Each value is a 256-bit number.
+	const numBytes = 256 / 8
+
+	if len(m) < numBytes {
+		return nil, errors.New("bn256: not enough data")
+	}
+
+	if e.p == nil {
+		e.p = &curvePoint{}
+	} else {
+		e.p.x, e.p.y = gfP{0}, gfP{0}
+	}
+
+	ySgn := (m[0] >= 128)
+	if ySgn {
+		m[0] -= 128
+	}
+
+	e.p.x.Unmarshal(m)
+	zero := gfP{0}
+	if e.p.x == zero {
+		// This is the point at infinity.
+		e.p.y = *newGFp(1)
+		e.p.z = gfP{0}
+		e.p.t = gfP{0}
+	} else {
+		x3 := &gfP{}
+		gfpMul(x3, &e.p.x, &e.p.x)
+		gfpMul(x3, x3, &e.p.x)
+		gfpAdd(x3, x3, curveB)
+		if !isQuadraticResidue(x3) {
+			return nil, errors.New("bn256: x is not a valid point on the curve")
+		}
+		y := &gfP{0}
+		y.calcQuadraticResidue(x3)
+		montEncode(&e.p.x, &e.p.x)
+		montEncode(&e.p.y, &e.p.y)
+
+		e.p.z = *newGFp(1)
+		e.p.t = *newGFp(1)
+
+		if !e.p.IsOnCurve() {
+			return nil, errors.New("bn256: malformed point")
+		}
+	}
+	return m[numBytes:], nil
+}
+
 // Unmarshal sets e to the result of converting the output of Marshal back into
 // a group element and then returns e.
 func (e *G1) Unmarshal(m []byte) ([]byte, error) {

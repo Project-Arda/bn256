@@ -1,6 +1,8 @@
 package bn256
 
 import (
+	"fmt"
+	"math/big"
 	"testing"
 
 	"bytes"
@@ -8,6 +10,13 @@ import (
 
 	"golang.org/x/crypto/bn256"
 )
+
+func TestExp(t *testing.T) {
+	x := &gfP{2}
+	three := new(big.Int).SetInt64(3)
+	x.Exp(x, three)
+	fmt.Println(x)
+}
 
 func TestG1(t *testing.T) {
 	k, Ga, err := RandomG1(rand.Reader)
@@ -30,10 +39,12 @@ func TestG1Marshal(t *testing.T) {
 		t.Fatal(err)
 	}
 	ma := Ga.Marshal()
+	mac := Ga.MarshalCompressed()
 
 	Gb := new(G1)
-	_, err = Gb.Unmarshal(ma)
-	if err != nil {
+	_, err1 := Gb.Unmarshal(ma)
+	_, err2 := Gb.UnmarshalCompressed(mac)
+	if err1 != nil || err2 != nil {
 		t.Fatal(err)
 	}
 	mb := Gb.Marshal()
